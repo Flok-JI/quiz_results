@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MDR Quiz Results | Leaderboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'DM Sans', sans-serif; background-color: #f7f9fc; margin: 0; min-height: 100vh; }
+        .johner-red { color: #cc0000; }
+        .johner-bg-red { background-color: #cc0000; }
+        #results-container { display: flex; flex-direction: column; gap: 1rem; padding: 120px 2rem 50px 2rem; max-width: 800px; margin: 0 auto; }
+        .bar-container { background: white; border-radius: 1rem; padding: 1rem 1.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.02); border: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: 0.5rem; }
+        .bar-background { background: #f1f5f9; height: 12px; border-radius: 6px; width: 100%; overflow: hidden; position: relative; }
+        .bar-fill { height: 100%; background-color: #cc0000; border-radius: 6px; transition: width 1.5s cubic-bezier(0.1, 0.5, 0.1, 1); width: 0%; }
+        #status-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 12px; background: white; padding: 5px 15px; border-radius: 20px; border: 1px solid #e2e8f0; color: #64748b; z-index: 100; }
+    </style>
+</head>
+<body>
+
+    <div class="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md shadow-sm border-b p-5">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-6 h-10">
+                <img src="Johner_Institut_Logo_RGB.png" alt="Johner Logo" class="h-full object-contain">
+                <div class="h-8 w-px bg-slate-200"></div>
+                <img src="hpi-logo-colored.svg" alt="HPI Logo" class="h-full object-contain">
+            </div>
+            <h1 class="text-2xl font-bold text-slate-800 tracking-tight uppercase">QUIZ <span class="johner-red">LEADERBOARD</span></h1>
+        </div>
+    </div>
+
+    <div id="results-container">
+        <!-- Hier erscheinen die Balken -->
+        <div id="loading-state" class="text-center py-20 text-slate-400 text-lg">Suche nach Ergebnissen...</div>
+    </div>
+
+    <div id="status-bar">Initialisiere...</div>
+
+    <script>
+        // 1. DIESE BEIDEN WERTE PRÜFEN
+        const SUPABASE_URL = 'https://icuwbibmhlqpmfgvjibp.supabase.co'; 
+        // WICHTIG: Nutze hier den langen eyJ... Key aus den Supabase Settings (Settings -> API -> anon public)
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljdXdiaWJtaGxxcG1mZ3ZqaWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc0OTk1NDEsImV4cCI6MjA5MzA3NTU0MX0.8Yo8ueUcOEZt_ZEbIj_OvwCTQ2O3aOfhYxPWT1rq-OI'; 
+
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const container = document.getElementById('results-container');
+        const statusBar = document.getElementById('status-bar');
+
+        async function loadData() {
+            try {
+                // Wir fragen die Tabelle 'qualification' ab
+                const { data, error } = await supabaseClient
+                    .from('qualification')
+                    .select('*')
+                    .order('score', { ascending: false });
+
+                if (error) {
+                    console.error("Supabase Error:", error);
+                    statusBar.innerText = "🚨 Fehler: " + error.message;
+                    if(error.message.includes("not found")) {
+                        statusBar.innerText = "🚨 Tabelle 'qualification' wurde nicht gefunden!";
+                    }
+                    return;
+                }
+
+                if (data && data.length > 0) {
+                    document.getElementById('loading-state')?.remove();
+                    statusBar.innerText = "✅ " + data.length + " Teams gefunden. Aktualisiere...";
+                    renderLeaderboard(data);
+                } else {
+                    statusBar.innerText = "∅ Keine Daten in der Tabelle 'qualification' gefunden.";
+                }
+            } catch (err) {
+                statusBar.innerText = "❌ Verbindung unterbrochen.";
+            }
+        }
+
+        function renderLeaderboard(data) {
+            container.innerHTML = "";
+            data.forEach((item, index) => {
+                const maxPossibleScore = 700; 
+                const percentage = Math.max(0, Math.min(100, (item.score / maxPossibleScore) * 100));
+                
+                const barRow = document.createElement('div');
+                barRow.className = 'bar-container';
+                barRow.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-slate-700">#${index + 1} ${item.team || 'Anonym'}</span>
+                        <span class="text-slate-500 font-medium">${item.score} 💰</span>
+                    </div>
+                    <div class="bar-background">
+                        <div class="bar-fill" style="width: ${percentage}%"></div>
+                    </div>
+                `;
+                container.appendChild(barRow);
+            });
+        }
+
+        // Initialer Aufruf
+        loadData();
+        // Alle 5 Sekunden neu laden
+        setInterval(loadData, 5000);
+    </script>
+</body>
+</html>
